@@ -1,0 +1,190 @@
+
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  test_py_lua:
+    strategy:
+      fail-fast: false  # https://github.com/actions/runner-images#available-images
+      matrix:  # https://www.lua.org/versions.html
+        os: [ubuntu-26.04]
+        lua_version: ['5.1', '5.2', '5.3', '5.4', '5.5']
+        # include:  # 'luarocks make --local' fails on both macOS and Windows.
+        #  - os: macos-latest 
+        #    lua_version: '5.5'
+        #  - os: windows-latest
+        #    lua_version: '5.5'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: echo "${{ runner.os }} on ${{ runner.arch }}"
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: 3.x
+      - run: python -m pip install --upgrade pip
+      - if: runner.os == 'Windows'
+        uses: TheMrMilchmann/setup-msvc-dev@v4  # luarocks NEEDS this on Windows
+        with:
+          arch: ${{ runner.arch }}
+      - uses: luarocks/gh-actions-lua@v12
+        with:
+          luaVersion: ${{ matrix.lua_version }}
+      - uses: luarocks/gh-actions-luarocks@v7
+        with:
+          luaRocksVersion: "3.13.0"
+      - run: lua -v && luarocks --version  # lua 5.5.0 and luarocks 3.13.0
+      - run: luarocks config lua_version ${{ matrix.lua_version }}
+      - run: luarocks lint lunatic-python-scm-0.rockspec
+      - run: luarocks make --local  # Fails on both macOS and Windows.
+      - run: lua tests/test_py.lua
+      - run: luarocks list
+      - run: luarocks show lunatic-python
+      - run: luarocks doc lunatic-python
+      - run: luarocks test lunatic-python || true
+      #- run: whereis lua || true  # $GITHUB_WORKSPACE/.lua/bin/lua
+      - env:
+          PATH: ${{ github.workspace }}/.lua/bin:${{ env.PATH }}
+        run: |
+          # alias lua=lua${{ matrix.lua_version }}
+          alias lua=${{ github.workspace }}/.lua/bin/lua
+          pip install --editable . || true
+      - run: lua tests/test_py.lua
+      #- shell: python  # Sanity check
+      #  run: |
+      #    import lua
+      #    lg = lua.globals()
+      #    print(f"{lg = }")
+      #    print(f"{lg.string = }")
+      #    print(f"{lg.string.lower = }")
+      #    print(f"{lg.string.lower('Hello world!') = }")
+      #    assert lg.string.lower('Hello world!') != 'Hello world!'
+      #    assert lg.string.lower('Hello world!') == 'hello world!'
+      - run: python -m doctest tests/test_lua.py
+      - run: pip install pytest
+      - run: pytest || true
+      - run: pytest --doctest-modules || true
+
+  test_lua_py:
+    strategy:
+      fail-fast: false  # https://github.com/actions/runner-images#available-images
+      matrix:  # https://www.lua.org/versions.html
+        os: [ubuntu-26.04]  # Lua 5.5 is not apt installable on earlier versions of Ubuntu.
+        lua_version: ['5.1', '5.2', '5.3', '5.4', '5.5']
+        include:  # 'luarocks make --local' fails on both macOS and Windows.
+          - os: macos-latest 
+            lua_version: '5.5'
+          - os: windows-latest
+            lua_version: '5.1'
+          - os: windows-latest
+            lua_version: '5.2'
+          - os: windows-latest
+            lua_version: '5.3'
+          - os: windows-latest
+            lua_version: '5.4'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: echo "${{ runner.os }} on ${{ runner.arch }}"
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: 3.x
+      - run: python -m pip install --upgrade pip
+      - if: runner.os == 'Windows'
+        uses: TheMrMilchmann/setup-msvc-dev@v4  # luarocks NEEDS this on Windows
+        with:
+          arch: ${{ runner.arch }}
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua${{ matrix.lua_version }} liblua${{ matrix.lua_version }}-dev luarocks
+      - if: runner.os == 'macOS'
+        run: brew install luarocks
+      - if: runner.os == 'Windows' && matrix.lua_version == '5.1'
+        shell: bash
+        run: |
+          choco install lua51 luarocks
+          lua -h || lua -v || true  # lua: command not found
+          lua51 -h || lua51 -v || true
+          lua5.1 -h || lua5.1 -v || true
+      - if: runner.os == 'Windows' && matrix.lua_version == '5.2'
+        shell: bash
+        run: |
+          choco install lua52 luarocks
+          lua -h || lua -v || true  # lua: command not found
+          lua52 -h || lua52 -v || true
+          lua5.2 -h || lua5.2 -v || true
+      - if: runner.os == 'Windows' && matrix.lua_version == '5.3'
+        shell: bash
+        run: |
+          choco install lua53 luarocks
+          lua -h || lua -v || true  # lua: command not found
+          lua53 -h || lua53 -v || true
+          lua5.3 -h || lua5.3 -v || true
+      - if: runner.os == 'Windows' && matrix.lua_version == '5.4'
+        shell: bash
+        run: |
+          choco install lua luarocks
+          lua -h || lua -v || true  # lua: command not found
+          lua54 -h || lua54 -v || true
+          lua5.4 -h || lua5.4 -v || true
+      - if: runner.os == 'Windows' && matrix.lua_version == '5.5'
+        shell: bash
+        run: |
+          choco install lua51 lua52 lua53 lua luarocks
+          lua -h || lua -v || true  # lua: command not found
+          lua5.1 -h || lua5.1 -v || true
+          lua5.2 -h || lua5.2 -v || true
+          lua5.3 -h || lua5.3 -v || true
+          lua5.4 -h || lua5.4 -v || true
+          # choco install lua54 || true
+          # lua5.4 -h || lua5.4 -v || true
+          # choco install lua55 || true
+          # lua5.5 -h || lua5.5 -v || true
+      - if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          Set-Alias lua lua${{ matrix.lua_version }}
+          lua${{ matrix.lua_version }} -v
+          lua -v
+      - if: runner.os == 'Windows'
+        run: lua${{ matrix.lua_version }} -v && luarocks --version  # lua 5.5.0 and luarocks 3.13.0
+      - run: lua -v && luarocks --version  # lua 5.5.0 and luarocks 3.13.0
+      - run: luarocks config lua_version ${{ matrix.lua_version }}
+      - if: runner.os == 'Linux' && matrix.lua_version == '5.5'
+        run: |
+          dpkg -S /usr/include/lua5.5/lua.h
+          # Fix the version with #define macro bug on Ubuntu 10.04.
+          export PCDIR=$(pkgconf lua5.5 --variable pcfiledir)
+          # Fix https://bugs.launchpad.net/ubuntu/+source/lua5.5/+bug/2160598
+          # If #define is present then fix the version...
+          grep '#define' $PCDIR/lua5.5.pc || sudo sed -i '/^version=5\.5\.\#define /c\version=5.5.0' $PCDIR/lua5.5.pc
+          # Fix https://bugs.launchpad.net/ubuntu/+source/lua5.5/+bug/2160601
+          luarocks config variables.LUA_INCDIR /usr/include/lua5.5
+          luarocks config variables.LUA_INCDIR_OK true
+          luarocks config
+      - run: luarocks lint lunatic-python-scm-0.rockspec
+      - run: luarocks make --local  # Fails on both macOS and Windows.
+      - run: lua tests/test_py.lua || true
+      - run: luarocks list
+      - run: luarocks show lunatic-python
+      - run: luarocks doc lunatic-python
+      - run: luarocks test lunatic-python || true
+      #- run: whereis lua || true  # $GITHUB_WORKSPACE/.lua/bin/lua
+      - run: pip install --editable . || true
+      - run: lua tests/test_py.lua || true
+      #- shell: python  # Sanity check
+      #  run: |
+      #    import lua
+      #    lg = lua.globals()
+      #    print(f"{lg = }")
+      #    print(f"{lg.string = }")
+      #    print(f"{lg.string.lower = }")
+      #    print(f"{lg.string.lower('Hello world!') = }")
+      #    assert lg.string.lower('Hello world!') != 'Hello world!'
+      #    assert lg.string.lower('Hello world!') == 'hello world!'
+      - run: python -m doctest tests/test_lua.py
+      - run: pip install pytest
+      - run: pytest || true
+      - run: pytest --doctest-modules || true
