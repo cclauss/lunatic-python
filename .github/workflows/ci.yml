@@ -1,0 +1,70 @@
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  ci:
+    strategy:
+      fail-fast: false  # https://github.com/actions/runner-images#available-images
+      matrix:  # https://www.lua.org/versions.html
+        os: [ubuntu-26.04, ubuntu-26.04-arm]
+        lua-version: [5.1, 5.2, 5.3, 5.4]
+        include:
+          - os: macos-26
+            lua-version: 5.5
+          - os: macos-26-intel
+            lua-version: 5.5
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: echo "${{ runner.os }} on ${{ runner.arch }}"
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua${{ matrix.lua-version }} liblua${{ matrix.lua-version }}-dev luarocks
+          mkdir -p $HOME/.luarocks  # So we can 'luarocks config'
+      - if: runner.os == 'macOS'
+        run: |
+          brew update
+          brew install lua@${{ matrix.lua-version }} luarocks
+        env:  # Supress the silly Homebrew GitHub Actions warnings
+          HOMEBREW_NO_REQUIRE_TAP_TRUST: 1
+      - run: lua${{ matrix.lua-version }} -v && luarocks --version
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: 3.x
+          pip-install: --editable .
+      - run: python -m doctest --verbose tests/test_lua.py
+      # - if: runner.os == 'macOS' && runner.arch == 'arm64'
+      #   # /opt/homebrew/opt/lua/lib --> /opt/homebrew/lib
+      #   run: luarocks config variables.LUA_LIBDIR "$HOMEBREW_PREFIX/lib"
+      - run: |
+          lua${{ matrix.lua-version }} -v && luarocks --version  # Linux: Lua 5.x.x Luarocks 3.8.0 (not >= 3.13.0)
+          luarocks config lua_version ${{ matrix.lua-version }}  # Bind luarocks to the correct version of Lua
+          luarocks config | grep LUA
+      - run: luarocks lint lunatic-python-scm-0.rockspec
+      - run: luarocks lint rockspecs/lunatic-python-1.0-1.rockspec
+      - env:
+          VERBOSE: 1
+        run: luarocks --local make
+      - if: runner.os == 'Linux'
+        run: ls -la /usr/lib/x86_64-linux-gnu/lua || true  # Linux only: 5.1, 5.3, 5.4
+      - run: luarocks list
+      - run: luarocks show lunatic-python
+      - run: lua${{ matrix.lua-version }} tests/test_py.lua
+      - run: python -m doctest --verbose tests/test_lua.py
+      - run: pip install pytest
+      - run: pytest
+      - run: pytest --doctest-modules
+      - shell: python
+        continue-on-error: true  # It is gonna fail!
+        run: |
+          import os
+          import sys
+
+          sys.path.append(os.getcwd())
+          import lua  # noqa: F401
+          print(lua.execute("print(2 + 2)"))
+          print(lua.execute("python = require 'python'"))  # RuntimeError
+          print(python.eval("2 + 2"))
