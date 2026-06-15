@@ -1,0 +1,51 @@
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  ci:
+    strategy:
+      fail-fast: false  # https://github.com/actions/runner-images#available-images
+      matrix:  # https://www.lua.org/versions.html
+        os: [macos-26, macos-26-intel, ubuntu-26.04, ubuntu-26.04-arm]
+        lua-version: [5.5]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: echo "${{ runner.os }} on ${{ runner.arch }}"
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua${{ matrix.lua-version }} liblua${{ matrix.lua-version }}-dev luarocks
+      - if: runner.os == 'macOS'
+        run: |
+          brew update
+          brew install lua@${{ matrix.lua-version }} luarocks
+        env:  # Supress the silly Homebrew GitHub Actions warnings
+          HOMEBREW_NO_REQUIRE_TAP_TRUST: 1
+      - run: lua${{ matrix.lua-version }} -v && luarocks --version
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: 3.x
+          pip-install: --editable .
+      - if: runner.os == 'macOS' && runner.arch == 'arm64'
+        # /opt/homebrew/opt/lua/lib --> /opt/homebrew/lib
+        run: luarocks config variables.LUA_LIBDIR "$HOMEBREW_PREFIX/lib"
+      - run: luarocks lint lunatic-python-scm-0.rockspec
+      - run: luarocks lint rockspecs/lunatic-python-1.0-1.rockspec
+      - env:
+          VERBOSE: 1
+        run: luarocks --local make
+      - run: luarocks list
+      - run: luarocks show lunatic-python
+      - run: python -m doctest tests/test_lua.py
+      - run: pip install pytest
+      - run: pytest
+      - run: pytest --doctest-modules
+      - run: |
+          luarocks show lunatic-python
+          luarocks config
+          echo "lua${{ matrix.lua-version }} tests/test_py.lua"
+          echo "---"
+          lua${{ matrix.lua-version }} tests/test_py.lua
