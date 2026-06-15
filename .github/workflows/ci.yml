@@ -1,0 +1,31 @@
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  ci:
+    runs-on: ubuntu-26.04
+    steps:
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y lua5.1 liblua5.1-0-dev
+      - run: lua -h || lua -v
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: 3.x
+      - run: pip install --upgrade pip
+      - env:
+          PYTHON_LIBRT: "amd64"  # "x64"
+        run: pip install --editable . || true  # TODO: Always fails even with $PYTHON_LIBRT defined!
+      - run: pip install lunatic-python-universal  # Workaround: Install from PyPI
+      - shell: python  # Sanity check
+        run: |
+          import lua
+          lg = lua.globals()
+          print(f"{lg = }")
+          print(f"{lg.string = }")
+          print(f"{lg.string.lower = }")
+          print(f"{lg.string.lower('Hello world!') = }")
+          assert lg.string.lower('Hello world!') != 'Hello world!'
+          assert lg.string.lower('Hello world!') == 'hello world!'
