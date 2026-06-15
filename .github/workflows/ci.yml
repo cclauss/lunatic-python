@@ -15,10 +15,7 @@ jobs:
         with:
           python-version: 3.x
       - run: pip install --upgrade pip
-      - env:
-          PYTHON_LIBRT: "amd64"  # "x64"
-        run: pip install --editable . || true  # TODO: Always fails even with $PYTHON_LIBRT defined!
-      - run: pip install lunatic-python-universal  # Workaround: Install from PyPI
+      - run: pip install --editable .
       - shell: python  # Sanity check
         run: |
           import lua
