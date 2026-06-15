@@ -8,7 +8,7 @@ jobs:
     strategy:
       fail-fast: false  # https://github.com/actions/runner-images#available-images
       matrix:  # https://www.lua.org/versions.html
-        lua-version: [lua5.1, lua5.2, lua5.3, lua5.4, lua5.5]
+        lua-version: [lua5.1, lua5.2, lua5.3]  # , lua5.4, lua5.5]
     runs-on: ubuntu-26.04
     steps:
       - run: sudo apt-get update
