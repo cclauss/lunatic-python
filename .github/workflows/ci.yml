@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-26.04
     steps:
       - run: sudo apt-get update
-      - run: sudo apt-get install -y ${{ matrix.lua-version }} lib${{ matrix.lua-version }}-0-dev
+      - run: sudo apt-get install -y ${{ matrix.lua-version }} lib${{ matrix.lua-version }}-dev
       - run: lua -h || lua -v
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
