@@ -8,12 +8,16 @@ jobs:
     strategy:
       fail-fast: false  # https://github.com/actions/runner-images#available-images
       matrix:  # https://www.lua.org/versions.html
-        lua-version: [lua5.1, lua5.2, lua5.3]  # , lua5.4, lua5.5]
         os: [ubuntu-26.04, ubuntu-26.04-arm, macos-latest, macos-26-intel]  # , windows-latest, windows-11-arm]
-        include:
-          - lua-version: lua@5.1
+        lua-version: [lua5.1, lua5.2, lua5.3]  # , lua5.4, lua5.5]
+        include:  # brew starts at lua@5.4
+          - lua-version: lua@5.4
             os: macos-latest
-          - lua-version: lua@5.1
+          - lua-version: lua@5.4
+            os: macos-26-intel
+          - lua-version: lua
+            os: macos-latest
+          - lua-version: lua
             os: macos-26-intel
     runs-on: ${{ matrix.os }}
     steps:
