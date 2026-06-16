@@ -8,25 +8,23 @@ jobs:
     strategy:
       fail-fast: false  # https://github.com/actions/runner-images#available-images
       matrix:  # https://www.lua.org/versions.html
-        os: [ubuntu-26.04, ubuntu-26.04-arm, macos-latest, macos-26-intel]  # , windows-latest, windows-11-arm]
+        os: [ubuntu-26.04, ubuntu-26.04-arm]  # , macos-latest, macos-26-intel , windows-latest, windows-11-arm]
         lua-version: [lua5.1, lua5.2, lua5.3]  # , lua5.4, lua5.5]
-        include:  # brew starts at lua@5.4
-          - lua-version: lua@5.4
-            os: macos-latest
-          - lua-version: lua@5.4
-            os: macos-26-intel
+        include:
           - lua-version: lua
-            os: macos-latest
+            os: windows-latest
           - lua-version: lua
-            os: macos-26-intel
+            os: windows-11-arm
     runs-on: ${{ matrix.os }}
     steps:
       - if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y ${{ matrix.lua-version }} lib${{ matrix.lua-version }}-dev
-      - if: runner.os == 'macOS'
+      - if: runner.os == 'macOS'  # brew starts with lua-version: lua@5.4
         run: brew install ${{ matrix.lua-version }}
+      - if: runner.os == 'Windows'
+        run: choco install lua
       - run: lua -h || lua -v
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
