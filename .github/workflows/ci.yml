@@ -11,9 +11,9 @@ jobs:
         os: [ubuntu-26.04, ubuntu-26.04-arm]  # , macos-latest, macos-26-intel , windows-latest, windows-11-arm]
         lua-version: [lua5.1, lua5.2, lua5.3]  # , lua5.4, lua5.5]
         include:
-          - lua-version: lua
+          - lua-version: lua5.3
             os: windows-latest
-          - lua-version: lua
+          - lua-version: lua5.3
             os: windows-11-arm
     runs-on: ${{ matrix.os }}
     steps:
@@ -24,7 +24,10 @@ jobs:
       - if: runner.os == 'macOS'  # brew starts with lua-version: lua@5.4
         run: brew install ${{ matrix.lua-version }}
       - if: runner.os == 'Windows'
-        run: choco install lua
+        uses: leafo/gh-actions-lua@v13
+        with:
+          luaVersion: ${{ matrix.lua-version }}
+          buildCache: false
       - run: lua -h || lua -v
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
