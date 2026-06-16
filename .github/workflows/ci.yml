@@ -1,0 +1,36 @@
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  ci:
+    strategy:
+      fail-fast: false  # https://github.com/actions/runner-images#available-images
+      matrix:  # https://www.lua.org/versions.html
+        os: [ubuntu-26.04, ubuntu-26.04-arm]  # , macos-latest, macos-26-intel , windows-latest, windows-11-arm]
+        lua-version: [lua5.1, lua5.2, lua5.3]  # , lua5.4, lua5.5]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ matrix.lua-version }} lib${{ matrix.lua-version }}-dev
+      - run: lua -h || lua -v
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: 3.x
+      - run: pip install --upgrade pip
+      - run: pip install --editable .
+      - shell: python  # Sanity check
+        run: |
+          import lua
+          lg = lua.globals()
+          print(f"{lg = }")
+          print(f"{lg.string = }")
+          print(f"{lg.string.lower = }")
+          print(f"{lg.string.lower('Hello world!') = }")
+          assert lg.string.lower('Hello world!') != 'Hello world!'
+          assert lg.string.lower('Hello world!') == 'hello world!'
+      - run: python tests/test_lua_in_python.py || true  # Segmentation fault (core dumped)!
