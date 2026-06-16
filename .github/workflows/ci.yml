@@ -10,28 +10,12 @@ jobs:
       matrix:  # https://www.lua.org/versions.html
         os: [ubuntu-26.04, ubuntu-26.04-arm]  # , macos-latest, macos-26-intel , windows-latest, windows-11-arm]
         lua-version: [lua5.1, lua5.2, lua5.3]  # , lua5.4, lua5.5]
-        include:
-          - os: macos-latest
-            lua-version: "5.3.6"
-          - os: macos-26-intel
-            lua-version: "5.3.6"
-          - os: windows-latest
-            lua-version: "5.3.6"
-          - os: windows-11-arm
-            lua-version: "5.3.6"
     runs-on: ${{ matrix.os }}
     steps:
       - if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y ${{ matrix.lua-version }} lib${{ matrix.lua-version }}-dev
-      - if: runner.os == 'Windows'  # https://github.com/leafo/gh-actions-lua#usage
-        uses: step-security/msvc-dev-cmd@v1
-      - if: runner.os == 'macOS' || runner.os == 'Windows'
-        uses: leafo/gh-actions-lua@v13
-        with:
-          luaVersion: ${{ matrix.lua-version }}
-          buildCache: false
       - run: lua -h || lua -v
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
