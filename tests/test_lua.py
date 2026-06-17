@@ -1,91 +1,99 @@
-"""
->>> lg = lua.globals()
->>> lg == lg._G
-True
->>> lg._G == lg._G
-True
->>> lg._G == lg['_G']
-True
+import re
+import __main__
 
->>> lg.foo = 'bar'
->>> lg.foo == u'bar'
-True
-
->>> lg.tmp = []
->>> lg.tmp
-[]
-
->>> lua.execute("x = {1, 2, 3, foo = {4, 5}}")
->>> lg.x[1], lg.x[2], lg.x[3]
-(1..., 2..., 3...)
->>> lg.x['foo'][1], lg.x['foo'][2]
-(4..., 5...)
-
->>> lua.require
-<built-in function require>
-
->>> lg.string
-<Lua table at 0x...>
->>> lg.string.lower
-<Lua function at 0x...>
->>> lg.string.lower("Hello world!") == u'hello world!'
-True
-
->>> d = {}
->>> lg.d = d
->>> lua.execute("d['key'] = 'value'")
->>> d
-{...'key': ...'value'}
-
->>> d2 = lua.eval("d")
->>> d is d2
-True
-
->>> lua.execute("python = require 'python'")
->>> lua.eval("python")
-<Lua table at 0x...>
-
->>> obj
-<MyClass>
-
->>> lua.eval("python.eval 'obj'")
-<MyClass>
-
->>> lua.eval(\"\"\"python.eval([[lua.eval('python.eval("obj")')]])\"\"\")
-<MyClass>
-
->>> lua.execute("pg = python.globals()")
->>> lua.eval("pg.obj")
-<MyClass>
-
->>> def show(key, value):
-...   print("key is %s and value is %s" % (repr(key), repr(value)))
-... 
->>> asfunc = lua.eval("python.asfunc")
->>> asfunc
-<Lua function at 0x...>
-
->>> l = ['a', 'b', 'c']
->>> t = lua.eval("{a=1, b=2, c=3}")
->>> for k in l:
-...   show(k, t[k])
-key is 'a' and value is 1...
-key is 'b' and value is 2...
-key is 'c' and value is 3...
-
-"""
-
-import sys, os
-sys.path.append(os.getcwd())
+import pytest
 
 
 class MyClass:
-    def __repr__(self): return '<MyClass>'
+    def __repr__(self):
+        return '<MyClass>'
+
 
 obj = MyClass()
+__main__.obj = obj
 
 
-if __name__ == '__main__':
-    import lua
-    import doctest
-    doctest.testmod(optionflags=doctest.ELLIPSIS)
+def _assert_repr(value, pattern):
+    assert re.fullmatch(pattern, repr(value))
+
+
+@pytest.fixture(scope='module')
+def lua():
+    return pytest.importorskip('lua')
+
+
+def test_globals_reference(lua):
+    lg = lua.globals()
+    assert lg == lg._G
+    assert lg._G == lg._G
+    assert lg._G == lg['_G']
+
+
+def test_assign_python_values(lua):
+    lg = lua.globals()
+
+    lg.foo = 'bar'
+    assert lg.foo == 'bar'
+
+    lg.tmp = []
+    assert lg.tmp == []
+
+
+def test_lua_table_access(lua):
+    lg = lua.globals()
+
+    lua.execute('x = {1, 2, 3, foo = {4, 5}}')
+    assert (lg.x[1], lg.x[2], lg.x[3]) == (1, 2, 3)
+    assert (lg.x['foo'][1], lg.x['foo'][2]) == (4, 5)
+
+
+def test_lua_module_and_string(lua):
+    lg = lua.globals()
+
+    assert lua.require.__name__ == 'require'
+
+    _assert_repr(lg.string, r'<Lua table at 0x[0-9a-fA-F]+>')
+    _assert_repr(lg.string.lower, r'<Lua function at 0x[0-9a-fA-F]+>')
+    assert lg.string.lower('Hello world!') == 'hello world!'
+
+
+def test_python_dict_round_trip(lua):
+    lg = lua.globals()
+
+    d = {}
+    lg.d = d
+    lua.execute("d['key'] = 'value'")
+    assert d['key'] == 'value'
+
+    d2 = lua.eval('d')
+    assert d is d2
+
+
+def test_python_interface_access(lua):
+    __main__.lua = lua
+    lua.execute("python = require 'python'")
+
+    _assert_repr(lua.eval('python'), r'<Lua table at 0x[0-9a-fA-F]+>')
+    assert lua.eval("python.eval 'obj'") is obj
+    assert lua.eval("""python.eval([[lua.eval('python.eval(\"obj\")')]])""") is obj
+
+    lua.execute('pg = python.globals()')
+    assert lua.eval('pg.obj') is obj
+
+
+def test_asfunc_and_table_iteration(lua):
+    observed = []
+
+    def show(key, value):
+        observed.append((key, value))
+
+    asfunc = lua.eval('python.asfunc')
+    _assert_repr(asfunc, r'<Lua function at 0x[0-9a-fA-F]+>')
+
+    l = ['a', 'b', 'c']
+    t = lua.eval('{a=1, b=2, c=3}')
+
+    for k in l:
+        show(k, t[k])
+
+    assert observed == [('a', 1), ('b', 2), ('c', 3)]
