@@ -31,8 +31,11 @@ jobs:
           print(f"{lg.string.lower('Hello world!') = }")
           assert lg.string.lower('Hello world!') != 'Hello world!'
           assert lg.string.lower('Hello world!') == 'hello world!'
-      - run: lua tests/test_py.lua || true  # TODO: module 'python' not found
-      - run: python tests/test_lua.py || true  # TODO: Segmentation fault (core dumped)
+      # - run: lua tests/test_py.lua || true  # TODO: module 'python' not found
+      # - run: python tests/test_lua.py || true  # TODO: Segmentation fault (core dumped)
+      - run: python tests/test_lua_in_python.py || true
+      - run: lua tests/test_python_in_lua.lua || true
+      - run: python tests/test_python_in_lua_in_python.py || true
       - run: pip install pytest
       - run: pytest || true  # TODO: Write some pytests
       - run: pytest --doctest-modules || true  # TODO: NameError: name 'lua' is not defined
