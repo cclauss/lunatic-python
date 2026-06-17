@@ -1,5 +1,6 @@
+import lua
+
 """
->>> import lua
 >>> lg = lua.globals()
 >>> lg == lg._G
 True
