@@ -1,0 +1,7 @@
+/home/runner/work/lunatic-python/lunatic-python/build/CMakeFiles/python.dir
+/home/runner/work/lunatic-python/lunatic-python/build/CMakeFiles/lua.dir
+/home/runner/work/lunatic-python/lunatic-python/build/CMakeFiles/edit_cache.dir
+/home/runner/work/lunatic-python/lunatic-python/build/CMakeFiles/rebuild_cache.dir
+/home/runner/work/lunatic-python/lunatic-python/build/src/CMakeFiles/src.dir
+/home/runner/work/lunatic-python/lunatic-python/build/src/CMakeFiles/edit_cache.dir
+/home/runner/work/lunatic-python/lunatic-python/build/src/CMakeFiles/rebuild_cache.dir

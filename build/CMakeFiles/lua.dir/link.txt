@@ -1,0 +1,1 @@
+/usr/bin/cc -fPIC -O3 -DNDEBUG -Wl,--dependency-file=CMakeFiles/lua.dir/link.d -shared  -o bin/lua.so src/CMakeFiles/src.dir/luainpython.c.o src/CMakeFiles/src.dir/pythoninlua.c.o  /usr/lib/x86_64-linux-gnu/liblua5.3.so -lm /usr/lib/x86_64-linux-gnu/libpython3.12.so
