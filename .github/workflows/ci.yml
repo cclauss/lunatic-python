@@ -1,0 +1,72 @@
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  ci:
+    strategy:
+      fail-fast: false  # https://github.com/actions/runner-images#available-images
+      matrix:  # https://www.lua.org/versions.html
+        os: [ubuntu-latest, macos-latest, macos-26-intel]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: echo "${{ runner.os }} on ${{ runner.arch }}"
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y luarocks
+      - if: runner.os == 'macOS'
+        run: brew install luarocks
+      - run: lua -v && luarocks --version  # Lua 5.5.0 Luarocks 3.13.0
+
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: 3.x
+          pip-install: --editable .
+      - if: runner.os == 'macOS' && runner.arch == 'arm64'
+        # /opt/homebrew/opt/lua/lib --> /opt/homebrew/lib
+        run: luarocks config variables.LUA_LIBDIR "$HOMEBREW_PREFIX/lib"
+      - run: luarocks lint lunatic-python-scm-0.rockspec
+      - run: luarocks lint rockspecs/lunatic-python-1.0-1.rockspec
+      - env:
+          VERBOSE: 1
+        run: luarocks --local make
+      - run: luarocks list
+      - run: luarocks show lunatic-python
+
+  actions:
+    strategy:
+      fail-fast: false  # https://github.com/actions/runner-images#available-images
+      matrix:  # https://www.lua.org/versions.html
+        os: [macos-latest, macos-26-intel, ubuntu-latest]
+        gh-actions-lua: [leafo, luarocks]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: echo "${{ runner.os }} on ${{ runner.arch }}"
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: 3.x
+      - if: matrix.gh-actions-lua == 'leafo'
+        uses: leafo/gh-actions-lua@v13
+        with:
+          luaVersion: "5.1"
+      - if: matrix.gh-actions-lua == 'luarocks'
+        uses: luarocks/gh-actions-lua@master
+        with:
+          luaVersion: "5.1"
+      - if: matrix.gh-actions-lua == 'leafo'
+        uses: leafo/gh-actions-luarocks@v6
+      - if: matrix.gh-actions-lua == 'luarocks'
+        uses: luarocks/gh-actions-luarocks@v6
+      - run: lua -v && luarocks --version
+      - run: luarocks
+      - run: luarocks config
+      # [x] TODO: macOS: ld: unknown options: -shared --> LD = clang
+      # [ ] TODO: macOS: ld: symbol(s) not found for architecture arm64
+      # - run: pip install --editable .
+      - env:
+          VERBOSE: 1
+        run: luarocks --local make
