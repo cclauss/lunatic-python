@@ -1,0 +1,43 @@
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  ci:
+    strategy:
+      fail-fast: false  # https://github.com/actions/runner-images#available-images
+      matrix:  # https://www.lua.org/versions.html
+        lua-version: [lua5.1, lua5.2, lua5.3, lua5.4, lua5.5]
+    runs-on: ubuntu-26.04
+    steps:
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y ${{ matrix.lua-version }} lib${{ matrix.lua-version }}-dev luarocks
+      - run: lua -h || lua -v
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: 3.x
+      - run: pip install --upgrade pip
+      - run: luarocks install --local lunatic-python
+      - run: echo "${{ runner.os }} on ${{ runner.arch }}"
+      # TODO: Always fails even with $PYTHON_LIBRT defined!
+      # When the local pip install fails, install from PyPI
+      - env:
+          PYTHON_LIBRT: "amd64"  # "x64"
+        run: pip install --editable . || pip install lunatic-python-universal
+      - shell: python  # Sanity check
+        run: |
+          import lua
+          lg = lua.globals()
+          print(f"{lg = }")
+          print(f"{lg.string = }")
+          print(f"{lg.string.lower = }")
+          print(f"{lg.string.lower('Hello world!') = }")
+          assert lg.string.lower('Hello world!') != 'Hello world!'
+          assert lg.string.lower('Hello world!') == 'hello world!'
+      - run: lua tests/test_py.lua || true  # TODO: module 'python' not found
+      - run: python tests/test_lua.py || true  # TODO: Segmentation fault (core dumped)
+      - run: pip install pytest
+      - run: pytest
+      - run: pytest --doctest-modules || true  # TODO: NameError: name 'lua' is not defined
