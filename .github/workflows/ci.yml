@@ -1,0 +1,71 @@
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  ci:
+    strategy:
+      fail-fast: false  # https://github.com/actions/runner-images#available-images
+      matrix:  # https://www.lua.org/versions.html
+        os: [ubuntu-26.04]  # , ubuntu-26.04-arm]
+        lua-version: [5.1, 5.2, 5.3, 5.4, 5.5]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: |
+          sudo apt-get update
+          sudo apt-get install --yes lua${{ matrix.lua-version }} liblua${{ matrix.lua-version }}-dev luarocks tree
+          ls -la /usr/lib/x86_64-linux-gnu/lua  # 5.1, 5.3, 5.4
+
+      - run: lua -v && luarocks --version  # Lua 5.x.x Luarocks 3.8.0
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: 3.x
+      - run: luarocks lint lunatic-python-scm-0.rockspec
+      - run: luarocks lint rockspecs/lunatic-python-1.0-1.rockspec
+      # - run: tree ${GITHUB_WORKSPACE}
+      - run: echo "LUA_INCDIR=$(pkg-config lua --var=includedir)"  # /usr/include
+      - run: dpkg -L liblua${{ matrix.lua-version }}-dev || true
+      - run: luarocks config | grep LUA
+      - run: luarocks --lua-version=${{ matrix.lua-version }} config | grep LUA
+      - if: runner.os == 'Linux' && matrix.lua-version == '5.5'  # Workaround for apt installed luarocks v3.8.0
+        run: |
+          mkdir -p $HOME/.luarocks/lua5.5
+          luarocks --lua-version=5.5 config | grep LUA  # LUA_INCDIR is missing so set it...
+          luarocks --lua-version=5.5 config variables.LUA_INCDIR /usr/include/lua5.5
+          luarocks --lua-version=5.5 config | grep LUA
+          # ls -la /usr/include/lua5.5  # looks good
+          ls -la /usr/lib/x86_64-linux-gnu/lua
+          echo "---"
+          luarocks config | grep LUA
+      # - run: luarocks --lua-version=${{ matrix.lua-version }} config variables.LUA_INCDIR || (luarocks --lua-version=${{ matrix.lua-version }} config variables.LUA_INCDIR /usr/include/lua${{ matrix.lua-version }} && luarocks --lua-version=${{ matrix.lua-version }} config variables.LUA_INCDIR)
+      # - run: luarocks --lua-version=${{ matrix.lua-version }} config variables.LUA_INCDIR || (mkdir -p $HOME/.luarocks/lua${{ matrix.lua-version }} && sh -c 'echo "variables = {LUA_INCDIR = \"/usr/include/lua${{ matrix.lua-version }}\",}" > $HOME/.luarocks/config-${{ matrix.lua-version }}.lua' && luarocks --lua-version=${{ matrix.lua-version }} config variables.LUA_INCDIR)
+      # - run: LUA_INCDIR=/usr/include/lua${{ matrix.lua-version }} luarocks --local --lua-version=${{ matrix.lua-version }} make
+      - run: luarocks --local --lua-version=${{ matrix.lua-version }} make
+      - run: luarocks --lua-version=${{ matrix.lua-version }} list
+      - run: luarocks --lua-version=${{ matrix.lua-version }} show lunatic-python || true
+      - run: tree $HOME/.luarocks
+      - run: cat $HOME/.luarocks/lib/luarocks/rocks-${{ matrix.lua-version }}/manifest || true
+      - run: cat $HOME/.luarocks/lib/luarocks/rocks-${{ matrix.lua-version }}/lunatic-python/scm-0/rock_manifest || true
+      - run: lua${{ matrix.lua-version }} -e 'print(2 + 2)'
+      - run: lua${{ matrix.lua-version }} -e 'python = require "python" ; print(python.eval "2 + 2")'
+      - run: pip install --editable .
+      - shell: python
+        run: |
+          import os
+          import sys
+          
+          sys.path.append(os.getcwd())
+          import lua  # noqa: F401
+          print(lua.execute("print(2 + 2)"))
+          print(lua.execute("python = require 'python'"))  # RuntimeError
+          print(python.eval("2 + 2"))
+      # lua5.2: https://github.com/bastibe/lunatic-python/issues/98
+      # lua5.4: https://github.com/bastibe/lunatic-python/issues/99
+      # lua5.5: https://github.com/bastibe/lunatic-python/issues/100
+      - if: matrix.lua-version == '5.1'  # || matrix.lua-version == '5.3'
+        run: lua${{ matrix.lua-version }} tests/test_py.lua
+      - run: pip install --editable .
+      - if: matrix.lua-version == '5.1' || matrix.lua-version == '5.3'
+        run: python -m doctest --verbose tests/test_lua.py
