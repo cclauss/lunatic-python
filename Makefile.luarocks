@@ -2,6 +2,8 @@ ifndef VERBOSE
 .SILENT:
 endif
 
+SHARED_LIB_FLAG = -shared
+
 ifeq ($(OS), Windows_NT)
 LIBEXT = .dll
 LIBEXT_S = .dll.a
@@ -10,6 +12,7 @@ RM = del
 else ifeq ($(shell uname -s),Darwin)
 LIBEXT = .dylib
 LIBEXT_S = .a
+SHARED_LIB_FLAG = -dynamiclib
 COPY = cp -v
 RM = rm -v -f
 else
@@ -37,7 +40,7 @@ OBJS := \
 
 $(TARGET): $(OBJS)
 	echo " LD $@"
-	$(LD) -shared -o $@ $^ $(LDFLAGS)
+	$(LD) $(SHARED_LIB_FLAG) -o $@ $^ $(LDFLAGS)
 
 $(TARGET_S): $(OBJS)
 	echo " AR $@"
