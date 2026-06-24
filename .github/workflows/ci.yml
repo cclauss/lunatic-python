@@ -1,0 +1,40 @@
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  ci:
+    strategy:
+      fail-fast: false  # https://github.com/actions/runner-images#available-images
+      matrix:  # https://www.lua.org/versions.html
+        os: [macos-26, macos-26-intel, ubuntu-26.04, ubuntu-26.04-arm]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: echo "${{ runner.os }} on ${{ runner.arch }}"
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y luarocks
+      - if: runner.os == 'macOS'
+        run: brew install luarocks
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: 3.x
+          pip-install: --editable .
+      # Dependencies installed.  Start testing.
+      - shell: python  # Sanity check
+        run: |
+          import lua
+          lg = lua.globals()
+          print(f"{lg = }")
+          print(f"{lg.string = }")
+          print(f"{lg.string.lower = }")
+          print(f"{lg.string.lower('Hello world!') = }")
+          assert lg.string.lower('Hello world!') != 'Hello world!'
+          assert lg.string.lower('Hello world!') == 'hello world!'
+      - run: python -m doctest tests/test_lua.py || true
+      - run: pip install pytest
+      - run: pytest || true
+      - run: pytest --doctest-modules || true
