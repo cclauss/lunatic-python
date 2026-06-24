@@ -1,28 +1,21 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
-import sys
 import os
+import sys
+from distutils.sysconfig import get_python_lib
+from subprocess import getstatusoutput
+from sysconfig import get_config_var, get_python_version
 
-if sys.version > '3':
-    PY3 = True
-else:
-    PY3 = False
-
-if PY3:
-    import subprocess as commands
-else:
-    import commands
-from distutils.core import setup, Extension
-from distutils.sysconfig import get_config_var, get_python_lib, get_python_version
+from setuptools import Extension, setup
 
 if os.path.isfile("MANIFEST"):
     os.unlink("MANIFEST")
 
-lua_versions = ["5.5", "5.4", "5.3", "5.2", "5.1"]
+lua_versions = ("5.5", "5.4", "5.3", "5.2", "5.1")
 
 LUAVERSION = None
 for version in lua_versions:
-	presult, poutput = commands.getstatusoutput("pkg-config --exists lua" + str(version))
+	presult, poutput = getstatusoutput("pkg-config --exists lua" + str(version))
 	if presult == 0:
 		LUAVERSION = version
 		break
@@ -43,7 +36,7 @@ def pkgconfig(*packages):
 
     combined_pcoutput = ''
     for package in packages:
-        (pcstatus, pcoutput) = commands.getstatusoutput(
+        (pcstatus, pcoutput) = getstatusoutput(
             "pkg-config --libs --cflags %s" % package)
         if pcstatus == 0:
             combined_pcoutput += ' ' + pcoutput
@@ -59,11 +52,7 @@ def pkgconfig(*packages):
         else:                           # throw others to extra_link_args
             kwargs.setdefault('extra_link_args', []).append(token)
 
-    if PY3:
-        items = kwargs.items()
-    else:
-        items = kwargs.iteritems()
-    for k, v in items:     # remove duplicated
+    for k, v in kwargs.items():     # remove duplicated
         kwargs[k] = list(set(v))
 
     return kwargs
