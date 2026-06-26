@@ -28,7 +28,7 @@ all: $(TARGET) $(TARGET_S)
 
 CFLAGS := -Isrc -fPIC $(shell python3-config --embed --cflags) -DPYTHON_LIBRT=$(shell pkg-config python3-embed --keep-system-libs --libs | sed -e 's/-L//g' -e 's/ -l/\/lib/g' | xargs echo -n)$(LIBEXT) -I$(LUA_INCDIR)
 
-LDFLAGS := $(shell python3-config --embed --ldflags)
+LDFLAGS := $(shell python3-config --embed --ldflags) -L$(LUA_LIBDIR) -llua
 ARFLAGS = $(shell python3-config --configdir)/libpython*$(LIBEXT_S)
 
 OBJS := \
