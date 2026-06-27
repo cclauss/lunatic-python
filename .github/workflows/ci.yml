@@ -1,0 +1,67 @@
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  ci:
+    strategy:
+      fail-fast: false  # https://github.com/actions/runner-images#available-images
+      matrix:  # https://www.lua.org/versions.html
+        os: [ubuntu-26.04, ubuntu-26.04-arm]
+        lua-version: [5.1, 5.2, 5.3, 5.4, 5.5]
+        include:
+          - os: macos-26
+            lua-version: "5.5"
+          - os: macos-26-intel
+            lua-version: "5.5"
+          - os: windows-latest
+            lua-version: "5.1"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: echo "${{ runner.os }} on ${{ runner.arch }}"
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua${{ matrix.lua-version }} liblua${{ matrix.lua-version }}-dev luarocks
+      - if: runner.os == 'macOS'
+        run: brew install lua luarocks
+      - if: runner.os == 'Windows'
+        uses: step-security/msvc-dev-cmd@v1  # luarocks NEEDS this
+      - if: runner.os == 'Windows'
+        run: choco install lua luarocks
+      - run: lua${{ matrix.lua-version }} -v && luarocks --version  # Lua 5.5.0 Luarocks 3.13.0
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: 3.x
+          pip-install: --upgrade pip
+      # TODO: macOS: ld: unknown options: -shared ; make: *** [python.dylib] Error 1
+      # TODO: Windows: Makefile.luarocks(2) : fatal error U1034: syntax error : separator missing
+      - if: runner.os != 'macOS'
+        run: luarocks --local make
+      # TODO: Not finding lua on Windows.
+      - if: runner.os == 'Windows'
+        run: pip install --editable . || pip install lunatic-python-universal
+      - if: runner.os != 'Windows'
+        run: pip install --editable .
+      - shell: python  # Sanity check
+        run: |
+          import lua
+          lg = lua.globals()
+          print(f"{lg = }")
+          print(f"{lg.string = }")
+          print(f"{lg.string.lower = }")
+          print(f"{lg.string.lower('Hello world!') = }")
+          assert lg.string.lower('Hello world!') != 'Hello world!'
+          assert lg.string.lower('Hello world!') == 'hello world!'
+      # TODO: Linux Lua5.2 only: lua5.2: python.so: undefined symbol: luaL_loadbuffer
+      # TODO: Linux Lua5.4 only: lua5.4: python.so: undefined symbol: lua_insert
+      # TODO: Linux Lua5.5 only: lua5.5: python.so: undefined symbol: luaL_openlibs
+      - if: runner.os == 'Linux' && (matrix.lua-version == '5.1' || matrix.lua-version == '5.3')
+        run: lua${{ matrix.lua-version }} tests/test_py.lua
+      - run: python tests/test_lua.py
+      - run: python -m doctest tests/test_lua.py
+      - run: pip install pytest
+      - run: pytest
+      - run: pytest --doctest-modules
