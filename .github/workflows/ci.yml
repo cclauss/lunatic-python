@@ -1,0 +1,47 @@
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  ci:
+    strategy:
+      fail-fast: false  # https://github.com/actions/runner-images#available-images
+      matrix:  # https://www.lua.org/versions.html
+        os: [ubuntu-26.04, ubuntu-26.04-arm]
+        lua-version: [5.1, 5.2, 5.3, 5.4, 5.5]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: echo "${{ runner.os }} on ${{ runner.arch }}"
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: 3.x
+      - uses: luarocks/gh-actions-lua@master
+        with:
+          luaVersion: ${{ matrix.lua-version }}
+      - uses: luarocks/gh-actions-luarocks@v6
+        with:
+          luarocksVersion: "3.13.0"
+      - run: lua -v && luarocks --version
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y liblua${{ matrix.lua-version }}-dev
+      # - run: luarocks config
+      - env:
+          VERBOSE: 1
+        run: luarocks make
+      - run: luarocks list
+      - run: luarocks show lunatic-python
+      - run: pip install --editable .
+      - shell: python  # Sanity check
+        run: |
+          import lua
+          lg = lua.globals()
+          print(f"{lg = }")
+          print(f"{lg.string = }")
+          print(f"{lg.string.lower = }")
+          print(f"{lg.string.lower('Hello world!') = }")
+          assert lg.string.lower('Hello world!') != 'Hello world!'
+          assert lg.string.lower('Hello world!') == 'hello world!'
+      - run: lua tests/test_py.lua
