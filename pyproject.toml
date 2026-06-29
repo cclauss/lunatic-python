@@ -1,0 +1,32 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = [
+  "setuptools>=61.2",
+]
+
+[project]
+name = "lunatic-python"
+version = "1.0"
+description = "Two-way bridge between Python and Lua"
+readme = "README.md"
+license.text = "LGPL"
+authors = [
+  { name = "Gustavo Niemeyer", email = "gustavo@niemeyer.net" },
+]
+requires-python = ">=3.10"
+classifiers = [
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+]
+urls.Homepage = "http://labix.org/lunatic-python"
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.distutils]
+bdist_rpm.doc-files = "python.lua LICENSE"
+bdist_rpm.use-bzip2 = 2
