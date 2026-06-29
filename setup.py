@@ -12,8 +12,11 @@ if PY3:
     import subprocess as commands
 else:
     import commands
-from distutils.core import setup, Extension
+from setuptools import setup, Extension
 from distutils.sysconfig import get_config_var, get_python_lib, get_python_version
+
+if not os.environ.get("PKG_CONFIG_PATH"):  # set this if needed on macOS
+    os.environ["PKG_CONFIG_PATH"] = get_config_var("LIBPC")
 
 if os.path.isfile("MANIFEST"):
     os.unlink("MANIFEST")
@@ -71,20 +74,7 @@ def pkgconfig(*packages):
 lua_pkgconfig = pkgconfig('lua' + LUAVERSION, 'python-' + PYTHONVERSION)
 lua_pkgconfig['extra_compile_args'] = ['-I/usr/include/lua'+LUAVERSION, '-DPYTHON_LIBRT="' + str(PYTHON_LIBRT) + '"']
 
-setup(name="lunatic-python",
-      version="1.0",
-      description="Two-way bridge between Python and Lua",
-      author="Gustavo Niemeyer",
-      author_email="gustavo@niemeyer.net",
-      url="http://labix.org/lunatic-python",
-      license="LGPL",
-      long_description="""\
-Lunatic Python is a two-way bridge between Python and Lua, allowing these
-languages to intercommunicate. Being two-way means that it allows Lua inside
-Python, Python inside Lua, Lua inside Python inside Lua, Python inside Lua
-inside Python, and so on.
-""",
-      ext_modules=[
+setup(ext_modules=[
         Extension("lua-python",
                   ["src/pythoninlua.c", "src/luainpython.c"],
                   **lua_pkgconfig),
