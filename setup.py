@@ -15,6 +15,12 @@ else:
 from distutils.core import setup, Extension
 from distutils.sysconfig import get_config_var, get_python_lib, get_python_version
 
+if not os.environ.get("PKG_CONFIG_PATH"):  # See `python3.14 -m sysconfig | grep LIBPC`
+    print(f"Setting PKG_CONFIG_PATH to {get_config_var('LIBPC') = }", file=sys.stderr)
+    os.environ["PKG_CONFIG_PATH"] = get_config_var("LIBPC")
+else:
+    print(f"Using {os.environ.get('PKG_CONFIG_PATH') = }, not {get_config_var('LIBPC') = }", file=sys.stderr)
+
 if os.path.isfile("MANIFEST"):
     os.unlink("MANIFEST")
 
