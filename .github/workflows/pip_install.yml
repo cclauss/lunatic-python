@@ -1,0 +1,236 @@
+name: pip_install
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  apt_and_brew:
+    strategy: &strategy
+      fail-fast: false
+      matrix:
+        os: [macos-26, ubuntu-26.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: echo "${{ runner.os }} on ${{ runner.arch }}"
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          apt search lua5.5 || true
+          sudo apt-get install --yes lua5.5 liblua5.5-dev
+      - if: runner.os == 'macOS'
+        run: |
+          brew install lua
+      - run: pkg-config --list-package-names | grep lua || echo "No Lua packages found"
+      - uses: actions/setup-python@v7
+        with:
+          python-version: 3.x
+      - run: python -m sysconfig
+      - run: pkg-config --list-package-names | grep lua || echo "No Lua packages found"
+      - run: pkg-config --exists lua5.5 && echo "Lua 5.5 is installed" || echo "Lua 5.5 is not installed"
+      - run: |
+          lua -v
+          env
+          python -V
+          pip install --editable lunatic-python@git+https://github.com/bastibe/lunatic-python
+
+  hererocks:
+    strategy: *strategy
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: echo "${{ runner.os }} on ${{ runner.arch }}"
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes liblua5.4-dev tree
+          tree /usr/lib/x86_64-linux-gnu/pkgconfig || echo "No pkgconfig directory found"
+          cat /usr/lib/x86_64-linux-gnu/pkgconfig/lua5.4.pc
+      - if: runner.os == 'macOS'
+        run: |
+          brew install tree
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: 3.x
+      - run: pip install setuptools
+      - run: |
+          pip install hererocks
+          hererocks lua --lua=latest
+          source lua/bin/activate
+          pkg-config --list-package-names | grep lua || echo "No Lua packages found"
+          lua -v
+          lua5.4 -v || echo "Lua 5.4 not found"
+          lua5.4.4 -v || echo "Lua 5.4.4 not found"
+          lua5.5 -v || echo "Lua 5.5 not found"
+          # which lua || echo "Lua not found"
+          # where lua || echo "Lua not found"
+          # whereis lua || echo "Lua not found"
+          # which lua5.4 || echo "Lua5.4 not found"
+          # where lua5.4 || echo "Lua5.4 not found"
+          # whereis lua5.4 || echo "Lua5.4 not found"
+          # env
+          python -V
+          echo "cat ${{ github.workspace }}/lua/hererocks.manifest..."
+          cat ${{ github.workspace }}/lua/hererocks.manifest || true
+      - name: Create lua5.4.pc for pkg-config on macOS
+        if: runner.os == 'macOS'
+        env:
+          LUA_LIBPC: ${{ github.workspace }}/lua/lib/pkgconfig
+        run: |
+          tree ${{ github.workspace }}/lua
+          mkdir -p "$LUA_LIBPC"
+          cat > "$LUA_LIBPC/lua5.4.pc" <<'EOF'
+          prefix=${pcfiledir}/../..
+      
+          exec_prefix=${prefix}
+          libdir=${exec_prefix}/lib
+          includedir=${prefix}/include
+      
+          Name: Lua
+          Description: Lua programming language
+          URL: https://www.lua.org/
+          Version: 5.4.4
+          Libs: -L${libdir} -llua
+          Cflags: -I${includedir}
+          EOF
+      
+          echo "PKG_CONFIG_PATH=$LUA_LIBPC:$PKG_CONFIG_PATH" >> "$GITHUB_ENV"
+          cp "$LUA_LIBPC/lua5.4.pc" "$LUA_LIBPC/lua.pc"
+          tree ${{ github.workspace }}/lua
+          cat "$LUA_LIBPC/lua5.4.pc"
+
+      - shell: python
+        run: |
+          import os
+          print(f"{os.environ.get('PKG_CONFIG_PATH') = }")
+          from sysconfig import get_config_var, get_scheme_names
+          print(f"{get_scheme_names() = }")
+          print(f"{get_config_var('LIBDIR') = }")
+          print(f"{get_config_var('LIBPC') = }")
+          from distutils.sysconfig import get_config_var
+          print(f"{get_config_var('LIBDIR') = }")
+          print(f"{get_config_var('LIBPC') = }")
+
+      - run: |
+          lua -v || echo "Lua not found"
+          source lua/bin/activate
+          pkg-config --list-package-names | grep lua || echo "No Lua packages found"
+          lua -v
+          lua5.4 -v || echo "Lua 5.4 not installed"
+          pkg-config lua5.4 --print-variables
+          pkg-config lua5.4 --variable=includedir
+          pkg-config lua5.4 --variable=libdir
+          pkg-config lua5.4 --variable=exec_prefix
+          pkg-config lua5.4 --variable=prefix
+          pkg-config lua5.4 --variable=R
+          pkg-config lua5.4 --variable=V
+          pkg-config lua5.4 --variable=pcfiledir
+          pip install --editable lunatic-python@git+https://github.com/bastibe/lunatic-python
+
+  leafo:
+    strategy: *strategy
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: echo "${{ runner.os }} on ${{ runner.arch }}"
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes liblua5.5-dev tree
+      - if: runner.os == 'macOS'
+        run: |
+          brew install tree
+      - uses: actions/setup-python@v7
+        with:
+          python-version: 3.x
+      - run: pip install setuptools
+      - uses: leafo/gh-actions-lua@master
+      - name: Create lua5.5.pc for pkg-config on macOS
+        if: runner.os == 'macOS'
+        env:
+          LUA_LIBPC: ${{ github.workspace }}/.lua/lib/pkgconfig
+        run: |
+          mkdir -p "$LUA_LIBPC"
+          cat > "$LUA_LIBPC/lua5.5.pc" <<'EOF'
+          prefix=${pcfiledir}/../..
+      
+          exec_prefix=${prefix}
+          libdir=${exec_prefix}/lib
+          includedir=${prefix}/include
+      
+          Name: Lua
+          Description: Lua programming language
+          URL: https://www.lua.org/
+          Version: 5.5.0
+          Libs: -L${libdir} -llua
+          Cflags: -I${includedir}
+          EOF
+      
+          echo "PKG_CONFIG_PATH=$LUA_LIBPC:$PKG_CONFIG_PATH" >> "$GITHUB_ENV"
+          cat "$LUA_LIBPC/lua5.5.pc"
+      - run: python -m sysconfig
+      - run: pkg-config --list-package-names | grep lua || echo "No Lua packages found"
+      - run: pkg-config --exists lua5.5 && echo "Lua 5.5 is installed" || echo "Lua 5.5 is not installed"
+      - run: which lua || echo "Lua not found"
+      - run: where lua || echo "Lua not found"
+      - run: whereis lua || echo "Lua not found"
+      - run: tree $GITHUB_WORKSPACE/.lua || echo "No tree command found"
+      - shell: python
+        run: |
+          import os
+          print(f"{os.environ.get('PKG_CONFIG_PATH') = }")
+          from sysconfig import get_config_var, get_scheme_names
+          print(f"{get_scheme_names() = }")
+          print(f"{get_config_var('LIBDIR') = }")
+          print(f"{get_config_var('LIBPC') = }")
+          from distutils.sysconfig import get_config_var
+          print(f"{get_config_var('LIBDIR') = }")
+          print(f"{get_config_var('LIBPC') = }")
+      - run: |
+          lua -v
+          env
+          python -V
+          pip install --editable lunatic-python@git+https://github.com/bastibe/lunatic-python
+
+  luarocks:
+    strategy: *strategy
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: echo "${{ runner.os }} on ${{ runner.arch }}"
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes liblua5.5-dev
+      - uses: actions/setup-python@v7
+        with:
+          python-version: 3.x
+      - uses: luarocks/gh-actions-lua@master
+      - name: Create lua5.5.pc for pkg-config on macOS
+        if: runner.os == 'macOS'
+        env:
+          LUA_LIBPC: ${{ github.workspace }}/.lua/lib/pkgconfig
+        run: |
+          mkdir -p "$LUA_LIBPC"
+          cat > "$LUA_LIBPC/lua5.5.pc" <<'EOF'
+          prefix=${pcfiledir}/../..
+      
+          exec_prefix=${prefix}
+          libdir=${exec_prefix}/lib
+          includedir=${prefix}/include
+      
+          Name: Lua
+          Description: Lua programming language
+          URL: https://www.lua.org/
+          Version: 5.5.0
+          Libs: -L${libdir} -llua
+          Cflags: -I${includedir}
+          EOF
+      
+          echo "PKG_CONFIG_PATH=$LUA_LIBPC:$PKG_CONFIG_PATH" >> "$GITHUB_ENV"
+          cat "$LUA_LIBPC/lua5.5.pc"
+      - run: python -m sysconfig
+      - run: pkg-config --list-package-names | grep lua || echo "No Lua packages found"
+      - run: pkg-config --exists lua5.5 && echo "Lua 5.5 is installed" || echo "Lua 5.5 is not installed"
+      - run: |
+          lua -v
+          env
+          python -V
+          pip install --editable lunatic-python@git+https://github.com/bastibe/lunatic-python
