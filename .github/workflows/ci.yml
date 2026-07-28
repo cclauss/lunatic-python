@@ -31,6 +31,7 @@ jobs:
       - run: sudo apt-get install --yes lua5.4 liblua5.4-dev lua5.5 liblua5.5-dev luarocks
       - name: apt install liblua5.5-dev installs pkgconfig/lua5.5.pc with a TYPO IN THE VERSION
         run: |
+          export PCDIR="$(pkgconf lua5.5 --variable=pcfiledir)"
           echo "apt install liblua5.4-dev liblua5.5-dev"
           echo "diff $PCDIR/lua5.4.pc $PCDIR/lua5.5.pc | grep -e include -e ver"
           echo "head 4 $PCDIR/lua5.4.pc"
