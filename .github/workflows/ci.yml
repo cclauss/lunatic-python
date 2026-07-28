@@ -1,0 +1,209 @@
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  lua5_5_pc_typo:
+    # `apt install liblua5.5-dev` creates a pkgconfig/lua5.5.pc file with a typo in
+    # the version that prevents luarocks config LUA_INCDIR variable from being set.
+    #
+    # Typo fix would be:
+    # ```diff
+    # - version=5.5.#define LUA_VERSION_RELEASE	LUAI_TOSTR(LUA_VERSION_RELEASE_N)
+    # - lib_name_include=lua5.5
+    # + version=5.5.0
+    # + lib_name_include=lua5.5
+    # ```
+    #
+    # This causes the luarocks LUA_INCDIR variable to be undefined, which may
+    # result in failures when calling `luarocks --lua-version=5.5 make`.
+    #
+    # Also, `apt-get install luarocks` delivers v3.8.0, which should be updated to
+    # luarocks >= v3.13 to support lua5.5.
+    runs-on: ubuntu-26.04
+    env:
+      PCDIR: "/usr/lib/x86_64-linux-gnu/pkgconfig"
+    steps:
+      - run: |
+          echo "${{ runner.os }} on ${{ runner.arch }}"
+          sudo apt-get update
+      - run: sudo apt-get install --yes lua5.4 liblua5.4-dev lua5.5 liblua5.5-dev luarocks
+      - name: apt install liblua5.5-dev installs pkgconfig/lua5.5.pc with a TYPO IN THE VERSION
+        run: |
+          export PCDIR="$(pkgconf lua5.5 --variable=pcfiledir)"
+          echo "apt install liblua5.4-dev liblua5.5-dev"
+          echo "diff $PCDIR/lua5.4.pc $PCDIR/lua5.5.pc | grep -e include -e ver"
+          echo "head 4 $PCDIR/lua5.4.pc"
+          echo "head 4 $PCDIR/lua5.5.pc"
+
+          diff $PCDIR/lua5.4.pc $PCDIR/lua5.5.pc | grep -e include -e ver
+
+          echo -e "\n-- head lua5.4.pc looks good:"
+          head -n 4 $PCDIR/lua5.4.pc || true  # No typo so LUA_INCDIR is set correctly
+          echo -e "\n-- head lua5.5.pc contains a typo in the version:"
+          head -n 4 $PCDIR/lua5.5.pc  # Version typo prevents LUA_INCDIR from being set
+          echo "-- Above '#define LUA_VERSION_RELEASE	LUAI_TOSTR(LUA_VERSION_RELEASE_N)' should be '0'!!!"
+
+          echo -e "\n-- 'luarocks --lua-version=5.5 config' does not have a LUA_INCDIR variable..."
+          echo "-- Check the luarocks config LUA_INCDIR variable for Lua 5.4 and Lua 5.5"
+          luarocks --lua-version=5.4 config | grep INC || echo "   LUA_INC* is not set for Lua 5.4"
+          luarocks --lua-version=5.5 config | grep INC || echo "   LUA_INCDIR is not set for Lua 5.5!!!"
+
+          echo -e "\n-- pkgconfig gets the correct 'includedir' and 'lib_name_include' values"
+          echo "$(pkgconf lua5.4 --variable=includedir)/$(pkgconf lua5.4 --variable=lib_name_include)"
+          echo "$(pkgconf lua5.5 --variable=includedir)/$(pkgconf lua5.5 --variable=lib_name_include)"
+          echo "-- DONE???"
+
+          echo "-- pkgconfig/lua5.5.pc has TYPO IN THE VERSION that prevents the definition of include*"
+          pkgconf lua5.5 --variable=includedir --variable=lib_name_include || echo "/usr/include/ and lua5.5"
+
+          pkgconf lua5.4 --variable=includedir || echo "lua5.4 is not installed -- lua5.4.0"
+          pkgconf lua5.4 --variable=lib_name_include || echo "lua5.5 is not installed -- lua5.5.0"
+          pkgconf lua5.5 --variable=includedir || echo "lua5.4 is not installed -- lua5.4.0"
+          pkgconf lua5.5 --variable=lib_name_include || echo "lua5.5 is not installed -- lua5.5.0"
+
+          echo "-- The typo seems to cause 'luarocks --lua-version=5.5 config' to not have a LUA_INCDIR"
+          echo "-- See the value before and after setting it"
+          pkgconf lua5.4 --print-variables | grep include || echo "lua5.4 is not installed -- /usr/include/lua5.4"
+          pkgconf lua5.5 --print-variables | grep include || echo "lua5.5 is not installed -- /usr/include/lua5.5"
+
+          echo "-- There is a comment in the version line that comments out the next line"
+          pkgconf lua5.5 --variable=version
+          head -n 4 $PCDIR/lua5.5.pc  # See the TYPO IN THE VERSION
+          pkgconf lua5.5 --variable=includedir  # Nothing!
+
+          echo "--Fix the typo"
+          sudo sed -i '/^version=5\.5\.\#define /c\version=5.5.0' $PCDIR/lua5.5.pc
+          head -n 4 $PCDIR/lua5.5.pc  # Typo fixed
+
+          echo "-- See the pkgconf value includedir before and after setting it"
+          pkgconf lua5.4 --variable=includedir
+          pkgconf lua5.5 --variable=includedir
+          pkgconf lua5.5 --define-variable=includedir="/usr/include/lua5.5"
+          pkgconf lua5.4 --variable=includedir
+          pkgconf lua5.5 --variable=includedir
+
+          echo "-- Now we can install luarocks and set LUA_INCDIR for Lua 5.5"
+          sudo apt-get install --yes luarocks
+
+          echo "-- Check the luarocks LUA_INCDIR and INCFILE variables for Lua 5.4 and Lua 5.5"
+          luarocks --lua-version=5.4 config | grep LUA_INC || echo "LUA_INC* is not set for Lua 5.4"
+          luarocks --lua-version=5.5 config | grep LUA_INC || echo "LUA_INC* is not set for Lua 5.5"
+
+          echo "-- Set the variable and check again"
+          mkdir -p $HOME/.luarocks  # So we can set luarocks variables
+          luarocks --lua-version=5.5 config variables.LUA_INCDIR /usr/include/lua5.5
+          luarocks --lua-version=5.5 config | grep LUA_INCDIR
+
+      - name: Use sed to fix the typo in pkgconfig/lua5.5.pc
+        run: |
+          sudo sed -i '/^version=5\.5\.\#define /c\version=5.5.0' $PCDIR/lua5.5.pc
+          head -n 4 $PCDIR/lua5.5.pc  # Typo is fixed
+      - name: Use luarocks to check LUA_INCDIR for Lua 5.4 and Lua 5.5
+        run: |
+          echo "-- luarocks setting for Lua 5.4:"
+          luarocks --lua-version=5.4 config | grep LUA  # LUA_INCDIR is set for Lua 5.4
+          echo "-- luarocks setting for Lua 5.5 do not have a LUA_INCDIR:"
+          luarocks --lua-version=5.5 config | grep LUA  # LUA_INCDIR is NOT set for Lua 5.5
+      - name: Use luarocks to set LUA_INCDIR for 5.5
+        run: |
+          mkdir -p $HOME/.luarocks
+          luarocks --lua-version=5.5 config variables.LUA_INCDIR /usr/include/lua5.5
+          luarocks --lua-version=5.5 config | grep LUA  # LUA_INCDIR is now set for Lua 5.5
+      - run: |
+          echo "`luarocks --lua-version=5.5  make` may still fail with:"
+          echo "# Error: Lua header mismatches configured version. You may need to install them or configure LUA_INCDIR."
+
+  lua5_5_pc_typo_fix:
+    # liblua5.5-dev installs a pkgconfig/lua5.5.pc file that contains a typo in the
+    # version that prevents `lib_name_include=lua5.5` from being set.
+    #
+    # ```diff
+    # - version=5.5.#define LUA_VERSION_RELEASE	LUAI_TOSTR(LUA_VERSION_RELEASE_N)
+    # - lib_name_include=lua5.5
+    # + version=5.5.0
+    # + lib_name_include=lua5.5
+    # ```
+    #
+    # This causes the luarocks LUA_INCDIR variable to be undefined, which results
+    # in failures when calling `luarocks --lua-version=5.5 make`.
+    #
+    # luarocks is also v3.8.0, which should be updated to >= v3.13 to support lua5.5.
+    runs-on: ubuntu-26.04
+    env:
+      PCDIR: "/usr/lib/x86_64-linux-gnu/pkgconfig"
+    steps:
+      - run: echo "${{ runner.os }} on ${{ runner.arch }}"
+      - run: |
+          sudo apt-get update
+          sudo apt-get install --yes lua5.4 liblua5.4-dev lua5.5 liblua5.5-dev # NOT YET: luarocks
+      - run: |
+          echo "-- pkgconfig/lua5.5.pc has TYPO IN THE VERSION"
+          pkgconf lua5.4 --variable=version || echo "lua5.4 is not installed -- lua5.4.8"
+          pkgconf lua5.5 --variable=version || echo "lua5.5 is not installed -- lua5.5.0"
+
+          echo "-- pkgconfig/lua5.5.pc has TYPO IN THE VERSION that prevents the definition of include*"
+          pkgconf lua5.4 --variable=includedir || echo "lua5.4 is not installed -- lua5.4.0"
+          pkgconf lua5.4 --variable=lib_name_include || echo "lua5.5 is not installed -- lua5.5.0"
+          pkgconf lua5.5 --variable=includedir || echo "lua5.4 is not installed -- lua5.4.0"
+          pkgconf lua5.5 --variable=lib_name_include || echo "lua5.5 is not installed -- lua5.5.0"
+
+          echo "-- This also means that `luarocks --lua-version=5.5 config` does not have a LUA_INCDIR"
+          echo "-- See the value before and after setting it"
+          pkgconf lua5.4 --print-variables | grep include || echo "lua5.4 is not installed -- /usr/include/lua5.4"
+          pkgconf lua5.5 --print-variables | grep include || echo "lua5.5 is not installed -- /usr/include/lua5.5"
+
+          echo "-- There is a comment in the version line that comments out the next line"
+          pkgconf lua5.5 --variable=version
+          head -n 4 $PCDIR/lua5.5.pc  # See the TYPO IN THE VERSION
+          pkgconf lua5.5 --variable=includedir  # Nothing!
+
+          echo "--Fix the typo"
+          sudo sed -i '/^version=5\.5\.\#define /c\version=5.5.0' $PCDIR/lua5.5.pc
+          head -n 4 $PCDIR/lua5.5.pc  # Typo fixed
+
+          echo "-- See the pkgconf value includedir before and after setting it"
+          pkgconf lua5.4 --variable=includedir
+          pkgconf lua5.5 --variable=includedir
+          pkgconf lua5.5 --define-variable=includedir="/usr/include/lua5.5"
+          pkgconf lua5.4 --variable=includedir
+          pkgconf lua5.5 --variable=includedir
+
+          echo "-- Now we can install luarocks and set LUA_INCDIR for Lua 5.5"
+          sudo apt-get install --yes luarocks
+
+          echo "-- Check the luarocks LUA_INCDIR and INCFILE variables for Lua 5.4 and Lua 5.5"
+          luarocks --lua-version=5.4 config | grep LUA_INC || echo "LUA_INC* is not set for Lua 5.4"
+          luarocks --lua-version=5.5 config | grep LUA_INC || echo "LUA_INC* is not set for Lua 5.5"
+
+          echo "-- Set the variable and check again"
+          mkdir -p $HOME/.luarocks  # So we can set luarocks variables
+          luarocks --lua-version=5.5 config variables.LUA_INCDIR /usr/include/lua5.5
+          luarocks --lua-version=5.5 config | grep LUA_INCDIR
+
+      - name: liblua5.5-dev installs pkgconfig/lua5.5.pc with a TYPO IN THE VERSION
+        run: |
+          echo "-- head lua5.4.pc looks good:"
+          head -n 4 $PCDIR/lua5.4.pc || true  # No typo so LUA_INCDIR is set correctly
+          echo "-- head lua5.5.pc contains a typo in the version:"
+          head -n 4 $PCDIR/lua5.5.pc  # Version typo prevents LUA_INCDIR from being set
+      - name: Use sed to fix the typo in pkgconfig/lua5.5.pc
+        run: |
+          sudo sed -i '/^version=5\.5\.\#define /c\version=5.5.0' $PCDIR/lua5.5.pc
+          head -n 4 $PCDIR/lua5.5.pc  # Typo is fixed
+      - name: Use luarocks to check LUA_INCDIR for Lua 5.4 and Lua 5.5
+        run: |
+          echo "-- luarocks setting for Lua 5.4:"
+          luarocks --lua-version=5.4 config | grep LUA  # LUA_INCDIR is set for Lua 5.4
+          echo "-- luarocks setting for Lua 5.5 do not have a LUA_INCDIR:"
+          luarocks --lua-version=5.5 config | grep LUA  # LUA_INCDIR is NOT set for Lua 5.5
+      - name: Use luarocks to set LUA_INCDIR for 5.5
+        run: |
+          mkdir -p $HOME/.luarocks
+          luarocks --lua-version=5.5 config variables.LUA_INCDIR /usr/include/lua5.5
+          luarocks --lua-version=5.5 config | grep LUA  # LUA_INCDIR is now set for Lua 5.5
+      - run: |
+          echo "`luarocks --lua-version=5.5  make` may still fail with:"
+          echo "# Error: Lua header mismatches configured version. You may need to install them or configure LUA_INCDIR."
+ 
