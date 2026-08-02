@@ -1,4 +1,3 @@
-
 name: ci
 on:
   push:
@@ -154,7 +153,8 @@ jobs:
           lua -v
       - if: runner.os == 'Windows'
         run: lua${{ matrix.lua_version }} -v && luarocks --version  # lua 5.5.0 and luarocks 3.13.0
-      - run: lua -v && luarocks --version  # lua 5.5.0 and luarocks 3.13.0
+      - if: runner.os != 'Windows'
+        run: lua -v && luarocks --version  # lua 5.5.0 and luarocks 3.13.0
       - run: luarocks config lua_version ${{ matrix.lua_version }}
       - if: runner.os == 'Linux' && matrix.lua_version == '5.5'
         run: |
