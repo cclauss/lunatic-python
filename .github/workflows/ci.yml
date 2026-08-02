@@ -148,7 +148,7 @@ jobs:
       - if: runner.os == 'Windows'
         shell: powershell
         run: |
-          Set-Alias lua lua${{ matrix.lua_version }}
+          Set-Alias lua C:\\ProgramData\\chocolatey\\lib\\lua52\\tools\\lua${{ matrix.lua_version }}
           lua${{ matrix.lua_version }} -v
           lua -v
       - if: runner.os == 'Windows'
