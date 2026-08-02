@@ -108,6 +108,7 @@ jobs:
           lua -h || lua -v || true  # lua: command not found
           lua51 -h || lua51 -v || true
           lua5.1 -h || lua5.1 -v || true
+          ls C:\\ProgramData\\chocolatey\\lib\\lua51\\tools
       - if: runner.os == 'Windows' && matrix.lua_version == '5.2'
         shell: bash
         run: |
@@ -115,6 +116,7 @@ jobs:
           lua -h || lua -v || true  # lua: command not found
           lua52 -h || lua52 -v || true
           lua5.2 -h || lua5.2 -v || true
+          ls C:\\ProgramData\\chocolatey\\lib\\lua52\\tools
       - if: runner.os == 'Windows' && matrix.lua_version == '5.3'
         shell: bash
         run: |
@@ -122,6 +124,7 @@ jobs:
           lua -h || lua -v || true  # lua: command not found
           lua53 -h || lua53 -v || true
           lua5.3 -h || lua5.3 -v || true
+          ls C:\\ProgramData\\chocolatey\\lib\\lua53\\tools
       - if: runner.os == 'Windows' && matrix.lua_version == '5.4'
         shell: bash
         run: |
@@ -129,6 +132,7 @@ jobs:
           lua -h || lua -v || true  # lua: command not found
           lua54 -h || lua54 -v || true
           lua5.4 -h || lua5.4 -v || true
+          ls C:\\ProgramData\\chocolatey\\lib\\lua54\\tools
       - if: runner.os == 'Windows' && matrix.lua_version == '5.5'
         shell: bash
         run: |
