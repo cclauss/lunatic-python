@@ -108,6 +108,7 @@ jobs:
           lua -h || lua -v || true  # lua: command not found
           lua51 -h || lua51 -v || true
           lua5.1 -h || lua5.1 -v || true
+          ls C:\ProgramData\chocolatey\lib\lua51\tools
       - if: runner.os == 'Windows' && matrix.lua_version == '5.2'
         shell: bash
         run: |
@@ -150,7 +151,8 @@ jobs:
           lua -v
       - if: runner.os == 'Windows'
         run: lua${{ matrix.lua_version }} -v && luarocks --version  # lua 5.5.0 and luarocks 3.13.0
-      - run: lua -v && luarocks --version  # lua 5.5.0 and luarocks 3.13.0
+      - if: runner.os != 'Windows'
+        run: lua -v && luarocks --version  # lua 5.5.0 and luarocks 3.13.0
       - run: luarocks config lua_version ${{ matrix.lua_version }}
       - if: runner.os == 'Linux' && matrix.lua_version == '5.5'
         run: |
